@@ -193,7 +193,7 @@ header h1 span{color:#9a9ab0;font-weight:400;margin-left:6px}
 /* Role-based visibility */
 body.role-viewer .admin-only{display:none!important}
 body.role-viewer .sb{cursor:default}
-body.role-viewer .sb .ba{display:none}
+body.role-viewer .sb .ba .rm{display:none}
 body.role-viewer .s-item .del{display:none!important}
 body.role-viewer .s-item input[type="checkbox"]{pointer-events:none;opacity:.4}
 body.role-viewer .s-item{cursor:default}
@@ -557,7 +557,7 @@ function renderList(){
     const adm=isAdmin();
     return `<div class="s-item ${pl?'placed':''}" data-tier="${s.tier}" data-id="${s.id}" ${adm?'draggable="true" ondragstart="dragS(event,'+s.id+')"':''}>
       <input type="checkbox" ${pl?'checked':''} ${adm?'onchange="togPlace('+s.id+',this.checked)"':'disabled'}>
-      <span class="nm">${esc(s.name)}</span><span class="pr">${s.tier}€</span>${badge}
+      <span class="nm" style="cursor:pointer" onclick="openModal(${s.id})" title="Épingler à une page">${esc(s.name)}</span><span class="pr">${s.tier}€</span>${badge}
       ${adm?`<button class="del" onclick="deleteSponsor(${s.id})">&times;</button>`:''}</div>`;
   }).join('');
 }
@@ -610,7 +610,7 @@ function renderPageWrap(pi){
         cells+=`<div class="sb" data-tier="${s.tier}" data-id="${s.id}"
           style="left:${l}px;top:${tp}px;width:${w}px;height:${h}px"
           ${adm?`draggable="true" ondragstart="dragB(event,${s.id})"`:''}>
-          ${adm?`<div class="ba"><button onclick="openModal(${s.id})" title="Épingler">&#8596;</button><button class="rm" onclick="removeBlock(${s.id})">&times;</button></div>`:''}
+          <div class="ba"><button onclick="openModal(${s.id})" title="Épingler">&#8596;</button>${adm?`<button class="rm" onclick="removeBlock(${s.id})">&times;</button>`:''}</div>
           <span class="bn">${esc(s.name)}</span>
           <span class="bp">${s.tier}€${s.pin>=0?' 📌':''}</span></div>`;
       }
@@ -677,11 +677,36 @@ function svgPage(pi){
 function copySVG(pi){navigator.clipboard.writeText(svgPage(pi)).then(()=>toast('SVG copié')).catch(()=>toast('Erreur'))}
 
 function exportPDF(){
-  const spPages=PAGES.map((p,i)=>i).filter(i=>hasSponsorSlots(i)&&grids[i].grid.flat().some(v=>v!==null));
-  if(!spPages.length){toast('Aucun sponsor placé');return}
-  let body='';spPages.forEach(pi=>{body+=`<div class="p">${svgPage(pi)}<span class="n">P${pi+1} — ${PAGES[pi].n}</span></div>`});
+  let body='';
+  for(let pi=0;pi<28;pi++){
+    const p=PAGES[pi],hasImg=!!pageImages[pi],hasSlots=hasSponsorSlots(pi);
+    let content='';
+    // Background image
+    if(hasImg) content+=`<img class="bg" src="${pageImages[pi]}">`;
+    // Sponsor SVG overlay (positioned in content area with margins)
+    if(hasSlots){
+      const svg=svgPage(pi).replace(/width="[^"]*"/,'width="100%"').replace(/height="[^"]*"/,'height="100%"');
+      content+=`<div class="sv">${svg}</div>`;
+    }
+    // Empty page placeholder (only if no image)
+    if(!hasImg&&!hasSlots) content+=`<div class="em">${esc(p.n)}</div>`;
+    body+=`<div class="p">${content}</div>`;
+  }
   const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><title>Sponsors Rosière 2026</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#eee;font-family:sans-serif}.p{background:#fff;width:${PW}mm;height:${PH}mm;margin:16px auto;box-shadow:0 2px 10px rgba(0,0,0,.1);position:relative;display:flex;align-items:center;justify-content:center;padding:${PM}mm}.p svg{display:block;width:100%;height:100%}.n{position:absolute;bottom:2mm;right:4mm;font-size:7px;color:#aaa}.bar{text-align:center;padding:12px;background:#fff;border-bottom:1px solid #ddd;position:sticky;top:0;z-index:10}.bar button{padding:7px 20px;background:#1e1e2e;color:#fff;border:none;border-radius:7px;font-size:12px;cursor:pointer}.bar span{color:#999;font-size:11px;margin-left:10px}@media print{.bar{display:none}body{background:#fff}.p{margin:0;box-shadow:none;page-break-after:always}.p:last-child{page-break-after:avoid}}@page{size:${PW}mm ${PH}mm landscape;margin:0}</style></head><body><div class="bar"><button onclick="window.print()">Imprimer / PDF</button><span>Enregistrer au format PDF</span></div>${body}</body></html>`);
+  w.document.write(`<!DOCTYPE html><html><head><title>Programme Rosière 2026</title><style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#eee;font-family:sans-serif}
+.p{background:#fff;width:${PW}mm;height:${PH}mm;margin:16px auto;box-shadow:0 2px 10px rgba(0,0,0,.1);position:relative;overflow:hidden}
+.p .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+.p .sv{position:absolute;left:${PM}mm;top:${PM}mm;width:${SW}mm;height:${SH}mm;z-index:1}
+.p .sv svg{width:100%;height:100%;display:block}
+.p .em{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;color:#ccc;font-weight:500}
+.bar{text-align:center;padding:12px;background:#fff;border-bottom:1px solid #ddd;position:sticky;top:0;z-index:10}
+.bar button{padding:7px 20px;background:#1e1e2e;color:#fff;border:none;border-radius:7px;font-size:12px;cursor:pointer;font-family:sans-serif}
+.bar span{color:#999;font-size:11px;margin-left:10px}
+@media print{.bar{display:none}body{background:#fff}.p{margin:0;box-shadow:none;page-break-after:always}.p:last-child{page-break-after:avoid}}
+@page{size:${PW}mm ${PH}mm landscape;margin:0}
+</style></head><body><div class="bar"><button onclick="window.print()">Imprimer / PDF</button><span>28 pages — Enregistrer au format PDF</span></div>${body}</body></html>`);
   w.document.close();
 }
 
@@ -772,25 +797,73 @@ function esc(s){const d=document.createElement('div');d.textContent=s;return d.i
 function escX(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
 
-// ─── Page Images ───
+// ─── Page Images (Supabase Storage) ───
 function setPageImg(pi){imgTarget=pi;document.getElementById('imgF').click()}
+
 function handleImgUpload(e){
   const file=e.target.files[0];if(!file||imgTarget<0)return;
+  const pi=imgTarget;
   const reader=new FileReader();
   reader.onload=ev=>{
     const img=new Image();
     img.onload=()=>{
-      const maxW=800,scale=Math.min(1,maxW/img.width);
+      const maxW=1200,scale=Math.min(1,maxW/img.width);
       const cv=document.createElement('canvas');cv.width=img.width*scale;cv.height=img.height*scale;
       cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
-      pageImages[imgTarget]=cv.toDataURL('image/jpeg',.75);
-      saveImages();renderAll();toast('Image ajoutée — P'+(imgTarget+1));
+      cv.toBlob(async blob=>{
+        toast('Upload en cours…');
+        const url=await storageUpload(pi,blob);
+        if(url){pageImages[pi]=url;saveImageUrls();renderAll();toast('Image ajoutée — P'+(pi+1))}
+        else toast('Erreur upload');
+      },'image/jpeg',.8);
     };img.src=ev.target.result;
   };reader.readAsDataURL(file);e.target.value='';
 }
-function clearPageImg(pi){pageImages[pi]=null;saveImages();renderAll();toast('Image retirée — P'+(pi+1))}
-function saveImages(){localStorage.setItem('rosiere-2026-images',JSON.stringify(pageImages))}
-function loadImages(){const r=localStorage.getItem('rosiere-2026-images');if(r)try{const d=JSON.parse(r);if(Array.isArray(d))pageImages=d}catch(e){}}
+
+async function storageUpload(pi,blob){
+  const path='page-'+pi+'.jpg';
+  try{
+    const res=await fetch(SB_URL+'/storage/v1/object/page-images/'+path,{
+      method:'POST',headers:{'Authorization':'Bearer '+SB_KEY,'apikey':SB_KEY,'Content-Type':'image/jpeg','x-upsert':'true'},
+      body:blob
+    });
+    if(res.ok) return SB_URL+'/storage/v1/object/public/page-images/'+path+'?v='+Date.now();
+  }catch(e){console.warn('Storage upload failed',e)}
+  return null;
+}
+
+async function clearPageImg(pi){
+  try{await fetch(SB_URL+'/storage/v1/object/page-images/page-'+pi+'.jpg',{
+    method:'DELETE',headers:{'Authorization':'Bearer '+SB_KEY,'apikey':SB_KEY}
+  })}catch(e){}
+  pageImages[pi]=null;saveImageUrls();renderAll();toast('Image retirée — P'+(pi+1));
+}
+
+async function saveImageUrls(){
+  // Save URLs to Supabase app_state
+  try{await fetch(SB_URL+'/rest/v1/app_state?id=eq.main',{
+    method:'PATCH',headers:SB_HEADERS,
+    body:JSON.stringify({page_images:pageImages,updated_at:new Date().toISOString()})
+  })}catch(e){console.warn('Failed to save image URLs',e)}
+  // Also cache locally
+  localStorage.setItem('rosiere-2026-images',JSON.stringify(pageImages));
+}
+
+async function loadImages(){
+  // Try Supabase first
+  try{
+    const res=await fetch(SB_URL+'/rest/v1/app_state?id=eq.main&select=page_images',{headers:SB_READ});
+    const rows=await res.json();
+    if(rows.length&&rows[0].page_images&&Array.isArray(rows[0].page_images)){
+      pageImages=rows[0].page_images;
+      localStorage.setItem('rosiere-2026-images',JSON.stringify(pageImages));
+      return;
+    }
+  }catch(e){}
+  // Fallback to localStorage
+  const r=localStorage.getItem('rosiere-2026-images');
+  if(r)try{const d=JSON.parse(r);if(Array.isArray(d))pageImages=d}catch(e){}
+}
 
 // ─── Flipbook ───
 let fbAnimating=false;
@@ -981,12 +1054,18 @@ async function deleteUser(id){
 }
 
 // ─── Init ───
-function initApp(){
+async function initApp(){
   initGrids();
   loadLocal();
-  loadImages();
+  // Load images from localStorage cache first for instant display
+  const lr=localStorage.getItem('rosiere-2026-images');
+  if(lr)try{const d=JSON.parse(lr);if(Array.isArray(d))pageImages=d}catch(e){}
   renderAll();
-  sbLoad().then(ok=>{if(ok)renderAll()});
+  // Then sync from Supabase
+  const ok=await sbLoad();
+  if(ok)renderAll();
+  await loadImages();
+  renderAll();
 }
 
 // Boot: check session or show login
