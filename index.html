@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Rosière 2026 — Programme</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 
@@ -337,6 +338,54 @@ body{
 .sponsor-row:hover .s-del{opacity:.4}
 .sponsor-row:hover .s-del:hover{opacity:1}
 .sponsor-row.placed .s-name{color:var(--text-tertiary)}
+
+/* Sponsor image indicator */
+.s-img-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:16px;height:16px;border-radius:3px;flex-shrink:0;
+}
+.s-img-badge svg{width:12px;height:12px}
+.s-img-badge.has-img{color:#467a3e;background:rgba(70,122,62,.1)}
+.s-img-badge.no-img{color:var(--text-tertiary);opacity:.3}
+
+/* Block image dot (grid) */
+.sb .img-dot{
+  position:absolute;bottom:3px;right:3px;
+  width:6px;height:6px;border-radius:50%;
+  background:#467a3e;border:1px solid rgba(255,255,255,.6);
+  z-index:4;
+}
+
+/* Modal image section */
+.modal-img-section{margin-bottom:14px}
+.modal-img-preview{
+  position:relative;display:inline-block;
+  margin-top:8px;border-radius:var(--radius-sm);
+  overflow:hidden;border:1px solid var(--border);
+}
+.modal-img-preview img{
+  display:block;max-width:100%;max-height:120px;
+  object-fit:contain;background:var(--bg);
+}
+.modal-img-preview .img-remove{
+  position:absolute;top:4px;right:4px;
+  background:rgba(0,0,0,.6);color:#fff;
+  border:none;border-radius:50%;width:20px;height:20px;
+  font-size:12px;line-height:1;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity 100ms ease;
+}
+.modal-img-preview:hover .img-remove{opacity:1}
+.modal-img-attach{
+  display:inline-flex;align-items:center;gap:5px;
+  margin-top:8px;padding:6px 12px;
+  border:1.5px dashed var(--border);border-radius:var(--radius-sm);
+  background:var(--bg);cursor:pointer;
+  font-size:11px;font-weight:500;color:var(--text-secondary);
+  font-family:inherit;
+  transition:border-color var(--duration-fast) ease,background var(--duration-fast) ease;
+}
+@media(hover:hover)and(pointer:fine){.modal-img-attach:hover{border-color:var(--border-focus);background:var(--surface)}}
 
 .empty-state{
   color:var(--text-tertiary);text-align:center;
@@ -986,7 +1035,8 @@ body.role-viewer .sponsor-row input[type="checkbox"]{pointer-events:none;opacity
       <button class="btn" onclick="copyList()"><svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copier</button>
       <button class="btn admin-only" onclick="exportJSON()"><svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exporter</button>
       <button class="btn admin-only" onclick="document.getElementById('impF').click()"><svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Importer</button>
-      <input type="file" id="impF" accept=".json" style="display:none" onchange="importJSON(event)">
+      <input type="file" id="impF" accept=".json,.zip" style="display:none" onchange="importJSON(event)">
+      <input type="file" id="sponsorImgF" accept="image/*" style="display:none" onchange="handleSponsorImg(event)">
     </div>
   </div>
 
@@ -1115,7 +1165,7 @@ function addSponsor(){
   if(!name){inp.focus();return}
   if(sponsors.find(s=>s.name.toLowerCase()===name.toLowerCase()))
     if(!confirm(`"${name}" existe déjà. Ajouter quand même ?`))return;
-  sponsors.push({id:nextId++,name,tier:selTierV,page:-1,pin:-1,col:-1,row:-1});
+  sponsors.push({id:nextId++,name,tier:selTierV,page:-1,pin:-1,col:-1,row:-1,img:null,imgName:null});
   inp.value='';inp.focus();
   repack();renderAll();save();
 }
@@ -1209,6 +1259,16 @@ function openModal(sid){
   });
   h+=`</div></div>`;
 
+  // Image section
+  h+=`<div class="modal-img-section"><div class="modal-sep">Visuel</div>`;
+  if(s.img){
+    h+=`<div class="modal-img-preview"><img src="${s.img}" alt="Visuel"><button class="img-remove" onclick="removeSponsorImg(${sid})" title="Supprimer">&times;</button></div>`;
+    h+=`<div style="margin-top:4px;font-size:10px;color:var(--text-tertiary)">${esc(s.imgName||'image')}</div>`;
+  } else {
+    h+=`<button class="modal-img-attach" onclick="triggerSponsorImg(${sid})"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Joindre un visuel</button>`;
+  }
+  h+=`</div>`;
+
   // Pin pages
   h+=`<div class="modal-options">`;
   h+=`<div class="modal-sep">Épingler à une page</div>`;
@@ -1233,6 +1293,64 @@ function openModal(sid){
 function closeModal(e){if(e&&e.target!==e.currentTarget)return;document.getElementById('movOv').classList.remove('open')}
 function pinTo(sid,pi){const s=sponsors.find(x=>x.id===sid);if(!s)return;s.pin=pi;repack();closeModal();renderAll();save()}
 function unpin(sid){const s=sponsors.find(x=>x.id===sid);if(!s)return;s.pin=-1;repack();closeModal();renderAll();save()}
+
+// ─── Sponsor images ───
+let pendingImgSid=null;
+
+function triggerSponsorImg(sid){
+  pendingImgSid=sid;
+  document.getElementById('sponsorImgF').click();
+}
+
+function handleSponsorImg(e){
+  const file=e.target.files[0];if(!file||pendingImgSid===null)return;
+  const sid=pendingImgSid;pendingImgSid=null;
+  const s=sponsors.find(x=>x.id===sid);if(!s)return;
+  compressImage(file,800,.85,b64=>{
+    s.img=b64;
+    s.imgName=file.name;
+    openModal(sid);
+    renderAll();save();
+    toast('Visuel joint à '+s.name);
+  });
+  e.target.value='';
+}
+
+function removeSponsorImg(sid){
+  const s=sponsors.find(x=>x.id===sid);if(!s)return;
+  s.img=null;s.imgName=null;
+  openModal(sid);
+  renderAll();save();
+  toast('Visuel retiré');
+}
+
+function compressImage(file,maxDim,quality,cb){
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.width,h=img.height;
+      if(w>maxDim||h>maxDim){
+        if(w>h){h=Math.round(h*(maxDim/w));w=maxDim}
+        else{w=Math.round(w*(maxDim/h));h=maxDim}
+      }
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      const ctx=c.getContext('2d');ctx.drawImage(img,0,0,w,h);
+      // Keep PNG if has transparency, otherwise JPEG
+      const isPng=file.type==='image/png';
+      const mime=isPng?'image/png':'image/jpeg';
+      const q=isPng?undefined:quality;
+      cb(c.toDataURL(mime,q));
+    };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function slugify(str){
+  return str.normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+}
 
 function changeTier(sid,newTier){
   const s=sponsors.find(x=>x.id===sid);if(!s||s.tier===newTier)return;
@@ -1302,9 +1420,14 @@ function renderList(){
       badge=`<span class="s-page-badge ${pinned?'pinned':''}">${pinned?'&#x1F4CC; ':''}P${s.page+1}</span>`;
     }
     const adm=isAdmin();
+    const hasVis=!!s.img;
+    const imgBdg=hasVis
+      ?`<span class="s-img-badge has-img" title="Visuel joint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>`
+      :`<span class="s-img-badge no-img" title="Aucun visuel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></span>`;
     return `<div class="sponsor-row ${pl?'placed':''}" data-tier="${s.tier}" data-id="${s.id}" ${adm?'draggable="true" ondragstart="dragS(event,'+s.id+')"':''}>
       <input type="checkbox" ${pl?'checked':''} ${adm?'onchange="togPlace('+s.id+',this.checked)"':'disabled'}>
-      <span class="s-name" onclick="openModal(${s.id})" title="Épingler à une page">${esc(s.name)}</span>
+      <span class="s-name" onclick="openModal(${s.id})" title="Gérer le sponsor">${esc(s.name)}</span>
+      ${imgBdg}
       <span class="s-price">${s.tier} €</span>${badge}
       ${adm?`<button class="s-del" onclick="deleteSponsor(${s.id})">&times;</button>`:''}</div>`;
   }).join('');
@@ -1352,7 +1475,7 @@ function renderPageWrap(pi){
           ${adm?`draggable="true" ondragstart="dragB(event,${s.id})"`:''}>
           <div class="ba"><button onclick="openModal(${s.id})" title="Épingler">&#8596;</button>${adm?`<button class="rm" onclick="removeBlock(${s.id})">&times;</button>`:''}</div>
           <span class="bn">${esc(s.name)}</span>
-          <span class="bp">${s.tier}&euro;${s.pin>=0?' &#x1F4CC;':''}</span></div>`;
+          <span class="bp">${s.tier}&euro;${s.pin>=0?' &#x1F4CC;':''}</span>${s.img?'<span class="img-dot" title="Visuel joint"></span>':''}</div>`;
       }
     }
     const occ=sid!==null;
@@ -1453,29 +1576,107 @@ function copyList(){
 }
 
 // ─── Import / Export ───
-function exportJSON(){
-  const data={sponsors,grids:grids.map(g=>g.grid),nextId,pageImages};
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download='sponsors-rosiere-'+new Date().toISOString().slice(0,10)+'.json';
-  a.click();URL.revokeObjectURL(a.href);toast('Sauvegarde exportée');
+async function exportJSON(){
+  const hasAnyImg=sponsors.some(s=>!!s.img);
+
+  if(hasAnyImg && typeof JSZip!=='undefined'){
+    // Export as ZIP with img/ folder
+    const zip=new JSZip();
+    const imgFolder=zip.folder('img');
+
+    // Build sponsors data without base64 for the JSON (lighter file)
+    const sponsorsClean=sponsors.map(s=>{
+      const copy={...s};
+      if(copy.img){
+        const ext=copy.img.startsWith('data:image/png')?'.png':'.jpg';
+        copy.imgFile=slugify(copy.name)+ext;
+        // Add image to ZIP
+        const b64data=copy.img.split(',')[1];
+        imgFolder.file(copy.imgFile,b64data,{base64:true});
+        delete copy.img; // remove heavy base64 from JSON
+      } else {
+        delete copy.img;
+        copy.imgFile=null;
+      }
+      delete copy.imgName;
+      return copy;
+    });
+
+    const data={sponsors:sponsorsClean,grids:grids.map(g=>g.grid),nextId,pageImages};
+    zip.file('sponsors-rosiere.json',JSON.stringify(data,null,2));
+
+    const blob=await zip.generateAsync({type:'blob'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='sponsors-rosiere-'+new Date().toISOString().slice(0,10)+'.zip';
+    a.click();URL.revokeObjectURL(a.href);
+    toast('Export ZIP avec '+sponsors.filter(s=>!!s.img).length+' visuels');
+  } else {
+    // Fallback: plain JSON (no images or JSZip unavailable)
+    const data={sponsors:sponsors.map(s=>({...s})),grids:grids.map(g=>g.grid),nextId,pageImages};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='sponsors-rosiere-'+new Date().toISOString().slice(0,10)+'.json';
+    a.click();URL.revokeObjectURL(a.href);toast('Sauvegarde exportée');
+  }
 }
 
-function importJSON(e){
+async function importJSON(e){
   const file=e.target.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=function(ev){
+
+  if(file.name.endsWith('.zip') && typeof JSZip!=='undefined'){
+    // ZIP import — restore images from img/ folder
     try{
-      const d=JSON.parse(ev.target.result);if(!d.sponsors)throw 0;
+      const zip=await JSZip.loadAsync(file);
+      const jsonFile=zip.file('sponsors-rosiere.json');
+      if(!jsonFile)throw 'JSON manquant dans le ZIP';
+      const jsonStr=await jsonFile.async('string');
+      const d=JSON.parse(jsonStr);if(!d.sponsors)throw 0;
       sponsors=d.sponsors;
-      sponsors.forEach(s=>{if(s.pin===undefined)s.pin=-1;if(s.page===undefined){s.page=s.pageIndex??-1}if(s.specialPageIndex!==undefined)delete s.specialPageIndex;if(s.pageIndex!==undefined)delete s.pageIndex});
+      // Restore images from zip
+      let imgCount=0;
+      for(const s of sponsors){
+        s.pin=s.pin??-1;
+        s.page=s.page??s.pageIndex??-1;
+        delete s.specialPageIndex;delete s.pageIndex;
+        if(s.imgFile){
+          const imgEntry=zip.file('img/'+s.imgFile);
+          if(imgEntry){
+            const b64=await imgEntry.async('base64');
+            const ext=s.imgFile.endsWith('.png')?'image/png':'image/jpeg';
+            s.img='data:'+ext+';base64,'+b64;
+            s.imgName=s.imgFile;
+            imgCount++;
+          } else {s.img=null;s.imgName=null}
+          delete s.imgFile;
+        } else {s.img=s.img||null;s.imgName=s.imgName||null}
+      }
       nextId=d.nextId||1;
       if(d.grids)d.grids.forEach((g,i)=>{if(grids[i])grids[i].grid=g});
       else repack();
       if(d.pageImages&&Array.isArray(d.pageImages)){pageImages=d.pageImages;saveImages()}
-      save();renderAll();toast(sponsors.length+' sponsors importés');
-    }catch(err){toast('Fichier invalide')}
-  };reader.readAsText(file);e.target.value='';
+      save();renderAll();toast(sponsors.length+' sponsors importés ('+imgCount+' visuels)');
+    }catch(err){toast('ZIP invalide : '+(err.message||err))}
+  } else {
+    // Plain JSON import
+    const reader=new FileReader();
+    reader.onload=function(ev){
+      try{
+        const d=JSON.parse(ev.target.result);if(!d.sponsors)throw 0;
+        sponsors=d.sponsors;
+        sponsors.forEach(s=>{
+          s.pin=s.pin??-1;s.page=s.page??s.pageIndex??-1;
+          delete s.specialPageIndex;delete s.pageIndex;
+          s.img=s.img||null;s.imgName=s.imgName||null;
+        });
+        nextId=d.nextId||1;
+        if(d.grids)d.grids.forEach((g,i)=>{if(grids[i])grids[i].grid=g});
+        else repack();
+        if(d.pageImages&&Array.isArray(d.pageImages)){pageImages=d.pageImages;saveImages()}
+        save();renderAll();toast(sponsors.length+' sponsors importés');
+      }catch(err){toast('Fichier invalide')}
+    };reader.readAsText(file);
+  }
+  e.target.value='';
 }
 
 let saving=false,pendingSave=false;
@@ -1508,7 +1709,12 @@ async function sbLoad(){
 
 function applyData(sp,gr,nid){
   sponsors=sp||[];nextId=nid||1;
-  sponsors.forEach(s=>{if(s.pin===undefined)s.pin=-1;if(s.page===undefined)s.page=-1});
+  sponsors.forEach(s=>{
+    if(s.pin===undefined)s.pin=-1;
+    if(s.page===undefined)s.page=-1;
+    if(s.img===undefined)s.img=null;
+    if(s.imgName===undefined)s.imgName=null;
+  });
   if(gr)gr.forEach((g,i)=>{if(grids[i])grids[i].grid=g});
 }
 
