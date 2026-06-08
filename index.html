@@ -517,6 +517,13 @@ body{
 .modal-opt:disabled{opacity:.3;cursor:default}
 .modal-opt .m-pg{color:var(--text-tertiary);font-weight:400;font-size:10px}
 
+.unpin-btn{
+  color:#c44!important;border-color:#e8c4c4!important;
+  background:#fff5f5!important;font-weight:600!important;
+  text-align:center!important;display:flex;align-items:center;justify-content:center;
+}
+@media(hover:hover)and(pointer:fine){.unpin-btn:hover{background:#ffe8e8!important;border-color:#d4a0a0!important}}
+
 .modal-cancel{
   margin-top:10px;padding:7px;width:100%;
   border:none;background:var(--bg);
@@ -1217,7 +1224,7 @@ function openModal(sid){
     h+=`<button class="modal-opt ${cur?'cur':''}" ${!fits?'disabled':''} onclick="pinTo(${sid},${i})">P${i+1} ${pin?'&#x1F4CC;':''} <span class="m-pg">${PAGES[i].n} &middot; ${cells} encarts</span></button>`;
   });
   if(s.pin>=0)
-    h+=`<div class="modal-sep"></div><button class="modal-opt" style="color:#e89040;border-color:#e8d0b0" onclick="unpin(${sid})">Retirer l'épingle (auto)</button>`;
+    h+=`<div class="modal-sep"></div><button class="modal-opt unpin-btn" onclick="unpin(${sid})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Désépingler — placement automatique</button>`;
   h+=`</div><button class="modal-cancel" onclick="closeModal()">Fermer</button>`;
   modal.innerHTML=h;
   document.getElementById('movOv').classList.add('open');
